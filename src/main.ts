@@ -3,6 +3,7 @@ import * as path from 'path';
 import copyService from './services/copyService';
 import configService from './services/configService';
 import databaseService from './services/databaseService';
+import vhostService from './services/vhostService';
 import { GenerateWordPressData, ServiceResult } from './types';
 
 let mainWindow: BrowserWindow | null;
@@ -106,8 +107,24 @@ ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: Gen
     console.log('[IPC] Database created successfully');
     event.sender.send('status-update', { step: 'database', message: 'Base de données créée avec succès.', success: true });
 
+    // Step 4: Generate vhost and hosts configurations
+    console.log('[IPC] Step 4: Generating vhost and hosts configurations...');
+    const serverName = data.serverName || vhostService.getSuggestedServerName(projectName);
+    const configs = vhostService.generateConfigs({
+      projectName,
+      projectPath,
+      serverName
+    });
+    console.log('[IPC] Vhost and hosts configurations generated');
+
     console.log('[IPC] WordPress generation completed successfully!');
-    return { success: true, message: 'Projet WordPress généré avec succès!' };
+    return {
+      success: true,
+      message: 'Projet WordPress généré avec succès!',
+      vhostConfig: configs.vhostConfig,
+      hostsEntry: configs.hostsEntry,
+      serverName: serverName
+    };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
     console.error('[IPC] Error during WordPress generation:', errorMessage);

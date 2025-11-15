@@ -30,6 +30,15 @@ let dbStatusText: HTMLSpanElement;
 let dbIndicator: HTMLSpanElement;
 let testDbBtn: HTMLButtonElement;
 
+// VHost section elements
+let vhostSection: HTMLDivElement;
+let vhostConfig: HTMLPreElement;
+let hostsConfig: HTMLPreElement;
+let copyVhostBtn: HTMLButtonElement;
+let copyHostsBtn: HTMLButtonElement;
+let vhostFilename: HTMLSpanElement;
+let siteLink: HTMLAnchorElement;
+
 // Titlebar controls
 let themeToggle: HTMLButtonElement;
 let minimizeBtn: HTMLButtonElement;
@@ -178,6 +187,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   statusConfig = document.getElementById('status-config') as HTMLDivElement;
   statusDatabase = document.getElementById('status-database') as HTMLDivElement;
 
+  // VHost elements
+  vhostSection = document.getElementById('vhostSection') as HTMLDivElement;
+  vhostConfig = document.getElementById('vhostConfig') as HTMLPreElement;
+  hostsConfig = document.getElementById('hostsConfig') as HTMLPreElement;
+  copyVhostBtn = document.getElementById('copyVhostBtn') as HTMLButtonElement;
+  copyHostsBtn = document.getElementById('copyHostsBtn') as HTMLButtonElement;
+  vhostFilename = document.getElementById('vhostFilename') as HTMLSpanElement;
+  siteLink = document.getElementById('siteLink') as HTMLAnchorElement;
+
   console.log('[DOM] All DOM elements initialized');
   console.log('[DOM] Theme toggle button:', themeToggle ? 'Found' : 'NOT FOUND');
 
@@ -299,6 +317,18 @@ function setupEventListeners(): void {
       if (result.success) {
         console.log('[GENERATE] Success!');
         showMessage(result.message || 'Projet généré avec succès', 'success');
+
+        // Display VHost and Hosts configurations
+        if (result.vhostConfig && result.hostsEntry && result.serverName) {
+          console.log('[VHOST] Displaying vhost and hosts configurations');
+          vhostSection.classList.remove('hidden');
+          vhostConfig.textContent = result.vhostConfig;
+          hostsConfig.textContent = result.hostsEntry;
+          vhostFilename.textContent = `${projectName}.conf`;
+          siteLink.href = `http://${result.serverName}`;
+          siteLink.textContent = result.serverName;
+          console.log('[VHOST] Configurations displayed for:', result.serverName);
+        }
       } else {
         console.error('[GENERATE] Failed:', result.message);
         showMessage(result.message || 'Erreur lors de la génération', 'error');
@@ -309,6 +339,44 @@ function setupEventListeners(): void {
       showMessage(`Erreur inattendue: ${errorMessage}`, 'error');
     } finally {
       setFormEnabled(true);
+    }
+  });
+
+  // Copy buttons for VHost configurations
+  console.log('[EVENTS] Setting up copy button listeners');
+  copyVhostBtn.addEventListener('click', async () => {
+    console.log('[COPY] Copy VHost button clicked');
+    try {
+      await navigator.clipboard.writeText(vhostConfig.textContent || '');
+      copyVhostBtn.textContent = 'Copié ✓';
+      copyVhostBtn.classList.add('copied');
+      console.log('[COPY] VHost configuration copied to clipboard');
+
+      setTimeout(() => {
+        copyVhostBtn.textContent = 'Copier';
+        copyVhostBtn.classList.remove('copied');
+      }, 2000);
+    } catch (error) {
+      console.error('[COPY] Failed to copy VHost:', error);
+      showMessage('Erreur lors de la copie', 'error');
+    }
+  });
+
+  copyHostsBtn.addEventListener('click', async () => {
+    console.log('[COPY] Copy Hosts button clicked');
+    try {
+      await navigator.clipboard.writeText(hostsConfig.textContent || '');
+      copyHostsBtn.textContent = 'Copié ✓';
+      copyHostsBtn.classList.add('copied');
+      console.log('[COPY] Hosts entry copied to clipboard');
+
+      setTimeout(() => {
+        copyHostsBtn.textContent = 'Copier';
+        copyHostsBtn.classList.remove('copied');
+      }, 2000);
+    } catch (error) {
+      console.error('[COPY] Failed to copy Hosts:', error);
+      showMessage('Erreur lors de la copie', 'error');
     }
   });
 

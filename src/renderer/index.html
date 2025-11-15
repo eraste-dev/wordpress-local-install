@@ -121,6 +121,45 @@
         </div>
         <div id="statusMessage" class="status-message"></div>
       </div>
+
+      <div id="vhostSection" class="vhost-section hidden">
+        <h2>Configuration VirtualHost et Hosts</h2>
+        <p class="vhost-intro">Copiez et collez ces configurations dans vos fichiers système :</p>
+
+        <div class="config-block">
+          <div class="config-header">
+            <h3>VirtualHost Apache</h3>
+            <div class="config-path">
+              <span class="label">Ubuntu:</span> <code>/etc/apache2/sites-available/<span id="vhostFilename"></span></code><br>
+              <span class="label">LAMPP/XAMPP:</span> <code>/opt/lampp/etc/extra/httpd-vhosts.conf</code>
+            </div>
+            <button id="copyVhostBtn" class="btn-copy">Copier</button>
+          </div>
+          <pre id="vhostConfig" class="config-content"></pre>
+        </div>
+
+        <div class="config-block">
+          <div class="config-header">
+            <h3>Fichier Hosts</h3>
+            <div class="config-path">
+              <span class="label">Linux:</span> <code>/etc/hosts</code><br>
+              <span class="label">Windows:</span> <code>C:\Windows\System32\drivers\etc\hosts</code>
+            </div>
+            <button id="copyHostsBtn" class="btn-copy">Copier</button>
+          </div>
+          <pre id="hostsConfig" class="config-content"></pre>
+        </div>
+
+        <div class="config-instructions">
+          <h4>Instructions :</h4>
+          <ol>
+            <li>Copiez la configuration VirtualHost et collez-la dans votre fichier de configuration Apache</li>
+            <li>Copiez l'entrée Hosts et ajoutez-la à votre fichier hosts</li>
+            <li>Redémarrez Apache : <code>sudo systemctl restart apache2</code> ou <code>sudo /opt/lampp/lampp restart</code></li>
+            <li>Accédez à votre site : <a href="#" id="siteLink" target="_blank"></a></li>
+          </ol>
+        </div>
+      </div>
     </main>
 
     <footer>

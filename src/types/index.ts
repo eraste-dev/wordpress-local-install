@@ -2,6 +2,7 @@ export interface GenerateWordPressData {
   projectName: string;
   databaseName: string;
   destinationPath: string;
+  serverName?: string;
 }
 
 export interface StatusUpdate {
@@ -16,6 +17,9 @@ export interface ServiceResult {
   path?: string;
   databaseName?: string;
   config?: DatabaseConfig | ConfigUpdateData;
+  vhostConfig?: string;
+  hostsEntry?: string;
+  serverName?: string;
   [key: string]: any;
 }
 
