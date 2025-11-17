@@ -12,12 +12,9 @@ const electronAPI: ElectronAPI = {
   testDbConnection: (): Promise<ServiceResult> =>
     ipcRenderer.invoke('test-db-connection'),
 
-  // Select directory (optional - for future implementation)
-  selectDirectory: async (): Promise<string | null> => {
-    // This would typically use a dialog.showOpenDialog
-    // For now, return null (user types path manually)
-    return null;
-  },
+  // Select directory
+  selectDirectory: (): Promise<string | null> =>
+    ipcRenderer.invoke('select-directory'),
 
   // Listen for status updates
   onStatusUpdate: (callback: (data: StatusUpdate) => void): void => {

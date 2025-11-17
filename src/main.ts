@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, IpcMainInvokeEvent, dialog } from 'electron';
 import * as path from 'path';
 import copyService from './services/copyService';
 import configService from './services/configService';
 import databaseService from './services/databaseService';
 import vhostService from './services/vhostService';
+import { ExtractService } from './services/extractService';
 import { GenerateWordPressData, ServiceResult } from './types';
 
 let mainWindow: BrowserWindow | null;
@@ -76,7 +77,7 @@ app.on('activate', () => {
 // IPC Handlers
 ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: GenerateWordPressData): Promise<ServiceResult> => {
   console.log('[IPC] Received generate-wordpress request:', data);
-  const { projectName, databaseName, destinationPath } = data;
+  const { projectName, databaseName, destinationPath, themesPath, pluginsPath } = data;
 
   try {
     // Step 1: Copy WordPress base
@@ -107,8 +108,48 @@ ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: Gen
     console.log('[IPC] Database created successfully');
     event.sender.send('status-update', { step: 'database', message: 'Base de données créée avec succès.', success: true });
 
-    // Step 4: Generate vhost and hosts configurations
-    console.log('[IPC] Step 4: Generating vhost and hosts configurations...');
+    // Step 4: Install themes (optional)
+    if (themesPath) {
+      console.log('[IPC] Step 4: Installing themes from:', themesPath);
+      event.sender.send('status-update', { step: 'themes', message: 'Installation des thèmes...' });
+      try {
+        const themesResult = await ExtractService.extractThemesFromDirectory(themesPath, projectPath);
+        if (themesResult.success) {
+          console.log('[IPC] Themes installed successfully:', themesResult.message);
+          event.sender.send('status-update', { step: 'themes', message: themesResult.message, success: true });
+        } else {
+          console.warn('[IPC] Themes installation failed:', themesResult.message);
+          event.sender.send('status-update', { step: 'themes', message: themesResult.message, success: false });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+        console.error('[IPC] Error installing themes:', errorMessage);
+        event.sender.send('status-update', { step: 'themes', message: `Erreur: ${errorMessage}`, success: false });
+      }
+    }
+
+    // Step 5: Install plugins (optional)
+    if (pluginsPath) {
+      console.log('[IPC] Step 5: Installing plugins from:', pluginsPath);
+      event.sender.send('status-update', { step: 'plugins', message: 'Installation des plugins...' });
+      try {
+        const pluginsResult = await ExtractService.extractPluginsFromDirectory(pluginsPath, projectPath);
+        if (pluginsResult.success) {
+          console.log('[IPC] Plugins installed successfully:', pluginsResult.message);
+          event.sender.send('status-update', { step: 'plugins', message: pluginsResult.message, success: true });
+        } else {
+          console.warn('[IPC] Plugins installation failed:', pluginsResult.message);
+          event.sender.send('status-update', { step: 'plugins', message: pluginsResult.message, success: false });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+        console.error('[IPC] Error installing plugins:', errorMessage);
+        event.sender.send('status-update', { step: 'plugins', message: `Erreur: ${errorMessage}`, success: false });
+      }
+    }
+
+    // Step 6: Generate vhost and hosts configurations
+    console.log('[IPC] Final step: Generating vhost and hosts configurations...');
     const serverName = data.serverName || vhostService.getSuggestedServerName(projectName);
     const configs = vhostService.generateConfigs({
       projectName,
@@ -149,6 +190,28 @@ ipcMain.handle('test-db-connection', async (): Promise<ServiceResult> => {
     console.error('[IPC] Database connection test failed:', errorMessage);
     return { success: false, message: `Erreur de connexion: ${errorMessage}` };
   }
+});
+
+// Select directory dialog
+ipcMain.handle('select-directory', async (): Promise<string | null> => {
+  console.log('[IPC] Opening directory selection dialog...');
+  if (!mainWindow) {
+    console.error('[IPC] Main window not available');
+    return null;
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    console.log('[IPC] Directory selection canceled');
+    return null;
+  }
+
+  const selectedPath = result.filePaths[0];
+  console.log('[IPC] Directory selected:', selectedPath);
+  return selectedPath;
 });
 
 // Window control handlers

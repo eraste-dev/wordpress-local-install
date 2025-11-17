@@ -3,10 +3,12 @@ export interface GenerateWordPressData {
   databaseName: string;
   destinationPath: string;
   serverName?: string;
+  themesPath?: string;
+  pluginsPath?: string;
 }
 
 export interface StatusUpdate {
-  step: 'copy' | 'config' | 'database' | 'error';
+  step: 'copy' | 'config' | 'database' | 'themes' | 'plugins' | 'error';
   message: string;
   success?: boolean;
 }

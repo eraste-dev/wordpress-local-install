@@ -53,6 +53,9 @@
 
   <div class="container">
     <header>
+      <div class="header-logo">
+        <img src="../../assets/logo.png" alt="WordPress Logo" class="main-logo">
+      </div>
       <h1>WordPress Automation</h1>
       <p class="subtitle">Générateur de projets WordPress automatisé</p>
     </header>
@@ -100,6 +103,46 @@
           <small>Le projet sera créé dans: <span id="fullPath">&lt;destination&gt;/&lt;nom-projet&gt;</span></small>
         </div>
 
+        <div class="form-section">
+          <h3 class="section-title">Options avancées (facultatif)</h3>
+
+          <div class="form-group">
+            <label for="themesPath">
+              <input type="checkbox" id="enableThemes" class="checkbox-toggle">
+              Importer des thèmes depuis un dossier
+            </label>
+            <div class="input-with-button conditional-input" id="themesPathGroup">
+              <input
+                type="text"
+                id="themesPath"
+                name="themesPath"
+                placeholder="Chemin vers le dossier contenant les thèmes (.zip/.rar)"
+                disabled
+              />
+              <button type="button" id="browseThemesBtn" class="btn-secondary" disabled>Parcourir</button>
+            </div>
+            <small>Sélectionnez un dossier contenant des archives de thèmes (.zip ou .rar)</small>
+          </div>
+
+          <div class="form-group">
+            <label for="pluginsPath">
+              <input type="checkbox" id="enablePlugins" class="checkbox-toggle">
+              Importer des plugins depuis un dossier
+            </label>
+            <div class="input-with-button conditional-input" id="pluginsPathGroup">
+              <input
+                type="text"
+                id="pluginsPath"
+                name="pluginsPath"
+                placeholder="Chemin vers le dossier contenant les plugins (.zip/.rar)"
+                disabled
+              />
+              <button type="button" id="browsePluginsBtn" class="btn-secondary" disabled>Parcourir</button>
+            </div>
+            <small>Sélectionnez un dossier contenant des archives de plugins (.zip ou .rar)</small>
+          </div>
+        </div>
+
         <button type="submit" id="generateBtn" class="btn-primary">Générer</button>
       </form>
 
@@ -117,6 +160,14 @@
           <div class="status-item" id="status-database">
             <span class="status-icon">○</span>
             <span class="status-text">Création de la base de données</span>
+          </div>
+          <div class="status-item hidden" id="status-themes">
+            <span class="status-icon">○</span>
+            <span class="status-text">Installation des thèmes</span>
+          </div>
+          <div class="status-item hidden" id="status-plugins">
+            <span class="status-icon">○</span>
+            <span class="status-text">Installation des plugins</span>
           </div>
         </div>
         <div id="statusMessage" class="status-message"></div>

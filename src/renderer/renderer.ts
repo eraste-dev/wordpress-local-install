@@ -30,6 +30,14 @@ let dbStatusText: HTMLSpanElement;
 let dbIndicator: HTMLSpanElement;
 let testDbBtn: HTMLButtonElement;
 
+// Theme and plugin inputs
+let enableThemesCheckbox: HTMLInputElement;
+let themesPathInput: HTMLInputElement;
+let browseThemesBtn: HTMLButtonElement;
+let enablePluginsCheckbox: HTMLInputElement;
+let pluginsPathInput: HTMLInputElement;
+let browsePluginsBtn: HTMLButtonElement;
+
 // VHost section elements
 let vhostSection: HTMLDivElement;
 let vhostConfig: HTMLPreElement;
@@ -49,6 +57,8 @@ let closeBtn: HTMLButtonElement;
 let statusCopy: HTMLDivElement;
 let statusConfig: HTMLDivElement;
 let statusDatabase: HTMLDivElement;
+let statusThemes: HTMLDivElement;
+let statusPlugins: HTMLDivElement;
 
 function toggleTheme(): void {
   const currentTheme = document.documentElement.getAttribute('data-theme');
@@ -68,6 +78,23 @@ function updateFullPath(): void {
   console.log('[PATH] Full path updated:', fullPath);
 }
 
+// Update database name based on project name
+function updateDatabaseName(): void {
+  const projectName = projectNameInput.value.trim();
+
+  // Only auto-fill if database name is empty or follows the pattern
+  const currentDbName = databaseNameInput.value.trim();
+  const shouldAutoFill = !currentDbName || currentDbName.startsWith('prefix_');
+
+  if (projectName && shouldAutoFill) {
+    // Replace hyphens with underscores and keep only alphanumeric + underscores
+    const sanitizedName = projectName.replace(/-/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    const newDbName = `prefix_${sanitizedName}`;
+    databaseNameInput.value = newDbName;
+    console.log('[DB] Database name auto-updated to:', newDbName);
+  }
+}
+
 // Update status item
 function updateStatusItem(step: string, message: string, success?: boolean): void {
   console.log('[STATUS] Updating status item:', { step, message, success });
@@ -82,6 +109,12 @@ function updateStatusItem(step: string, message: string, success?: boolean): voi
       break;
     case 'database':
       statusItem = statusDatabase;
+      break;
+    case 'themes':
+      statusItem = statusThemes;
+      break;
+    case 'plugins':
+      statusItem = statusPlugins;
       break;
     default:
       console.warn('[STATUS] Unknown step:', step);
@@ -186,6 +219,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   statusCopy = document.getElementById('status-copy') as HTMLDivElement;
   statusConfig = document.getElementById('status-config') as HTMLDivElement;
   statusDatabase = document.getElementById('status-database') as HTMLDivElement;
+  statusThemes = document.getElementById('status-themes') as HTMLDivElement;
+  statusPlugins = document.getElementById('status-plugins') as HTMLDivElement;
+
+  // Theme and plugin inputs
+  enableThemesCheckbox = document.getElementById('enableThemes') as HTMLInputElement;
+  themesPathInput = document.getElementById('themesPath') as HTMLInputElement;
+  browseThemesBtn = document.getElementById('browseThemesBtn') as HTMLButtonElement;
+  enablePluginsCheckbox = document.getElementById('enablePlugins') as HTMLInputElement;
+  pluginsPathInput = document.getElementById('pluginsPath') as HTMLInputElement;
+  browsePluginsBtn = document.getElementById('browsePluginsBtn') as HTMLButtonElement;
 
   // VHost elements
   vhostSection = document.getElementById('vhostSection') as HTMLDivElement;
@@ -240,7 +283,10 @@ function setupEventListeners(): void {
 
   // Form event listeners
   console.log('[EVENTS] Setting up form listeners');
-  projectNameInput.addEventListener('input', updateFullPath);
+  projectNameInput.addEventListener('input', () => {
+    updateFullPath();
+    updateDatabaseName();
+  });
   destinationPathInput.addEventListener('input', updateFullPath);
 
   browseBtn.addEventListener('click', async () => {
@@ -250,6 +296,48 @@ function setupEventListeners(): void {
     if (path) {
       destinationPathInput.value = path;
       updateFullPath();
+    }
+  });
+
+  // Theme checkbox toggle
+  enableThemesCheckbox.addEventListener('change', () => {
+    const enabled = enableThemesCheckbox.checked;
+    themesPathInput.disabled = !enabled;
+    browseThemesBtn.disabled = !enabled;
+    if (enabled) {
+      statusThemes.classList.remove('hidden');
+    }
+    console.log('[THEMES] Themes import enabled:', enabled);
+  });
+
+  // Plugin checkbox toggle
+  enablePluginsCheckbox.addEventListener('change', () => {
+    const enabled = enablePluginsCheckbox.checked;
+    pluginsPathInput.disabled = !enabled;
+    browsePluginsBtn.disabled = !enabled;
+    if (enabled) {
+      statusPlugins.classList.remove('hidden');
+    }
+    console.log('[PLUGINS] Plugins import enabled:', enabled);
+  });
+
+  // Browse themes directory
+  browseThemesBtn.addEventListener('click', async () => {
+    console.log('[BROWSE] Browse themes button clicked');
+    const path = await window.electronAPI.selectDirectory();
+    console.log('[BROWSE] Selected themes directory:', path);
+    if (path) {
+      themesPathInput.value = path;
+    }
+  });
+
+  // Browse plugins directory
+  browsePluginsBtn.addEventListener('click', async () => {
+    console.log('[BROWSE] Browse plugins button clicked');
+    const path = await window.electronAPI.selectDirectory();
+    console.log('[BROWSE] Selected plugins directory:', path);
+    if (path) {
+      pluginsPathInput.value = path;
     }
   });
 
@@ -290,8 +378,10 @@ function setupEventListeners(): void {
     const projectName = projectNameInput.value.trim();
     const databaseName = databaseNameInput.value.trim();
     const destinationPath = destinationPathInput.value.trim();
+    const themesPath = enableThemesCheckbox.checked ? themesPathInput.value.trim() : undefined;
+    const pluginsPath = enablePluginsCheckbox.checked ? pluginsPathInput.value.trim() : undefined;
 
-    console.log('[FORM] Form data:', { projectName, databaseName, destinationPath });
+    console.log('[FORM] Form data:', { projectName, databaseName, destinationPath, themesPath, pluginsPath });
 
     if (!projectName || !databaseName || !destinationPath) {
       console.warn('[FORM] Validation failed: missing fields');
@@ -302,6 +392,15 @@ function setupEventListeners(): void {
     console.log('[FORM] Validation passed, starting generation...');
     resetStatus();
     statusSection.classList.remove('hidden');
+
+    // Show theme/plugin status items if enabled
+    if (enableThemesCheckbox.checked) {
+      statusThemes.classList.remove('hidden');
+    }
+    if (enablePluginsCheckbox.checked) {
+      statusPlugins.classList.remove('hidden');
+    }
+
     setFormEnabled(false);
 
     try {
@@ -309,7 +408,9 @@ function setupEventListeners(): void {
       const result = await window.electronAPI.generateWordPress({
         projectName,
         databaseName,
-        destinationPath
+        destinationPath,
+        themesPath,
+        pluginsPath
       });
 
       console.log('[GENERATE] Result:', result);
