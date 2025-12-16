@@ -113,7 +113,11 @@ let statusConfig: HTMLDivElement;
 let statusDatabase: HTMLDivElement;
 let statusThemes: HTMLDivElement;
 let statusPlugins: HTMLDivElement;
+let statusPermissions: HTMLDivElement;
 let statusRollback: HTMLDivElement;
+
+// Generation header elements
+let generationHeader: HTMLDivElement;
 
 // State
 let isGenerating = false;
@@ -233,6 +237,9 @@ function updateStatusItem(step: string, message: string, success?: boolean): voi
     case 'plugins':
       statusItem = statusPlugins;
       break;
+    case 'permissions':
+      statusItem = statusPermissions;
+      break;
     case 'rollback':
       statusItem = statusRollback;
       statusItem.classList.remove('hidden');
@@ -276,6 +283,7 @@ function showMessage(text: string, type: 'info' | 'error' | 'success' = 'info'):
   console.log('[MESSAGE]', type.toUpperCase() + ':', text);
   statusMessage.textContent = text;
   statusMessage.className = 'status-message';
+  statusMessage.classList.remove('hidden');
   if (type === 'error') {
     statusMessage.classList.add('error');
   } else if (type === 'success') {
@@ -283,10 +291,48 @@ function showMessage(text: string, type: 'info' | 'error' | 'success' = 'info'):
   }
 }
 
+// Update generation header state (for success/error)
+function updateGenerationHeaderState(state: 'generating' | 'success' | 'error', title: string): void {
+  const headerH2 = generationHeader.querySelector('h2');
+  if (!headerH2) return;
+
+  if (state === 'success') {
+    headerH2.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--status-success)">
+        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      ${title}
+    `;
+    headerH2.style.color = 'var(--status-success)';
+    cancelBtn.classList.add('hidden');
+  } else if (state === 'error') {
+    headerH2.innerHTML = `
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--status-error)">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="15" y1="9" x2="9" y2="15"/>
+        <line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+      ${title}
+    `;
+    headerH2.style.color = 'var(--status-error)';
+    cancelBtn.classList.add('hidden');
+  } else {
+    headerH2.innerHTML = `
+      <svg class="spinning-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+      </svg>
+      ${title}
+    `;
+    headerH2.style.color = 'var(--accent-primary)';
+    cancelBtn.classList.remove('hidden');
+  }
+}
+
 // Reset status
 function resetStatus(): void {
   console.log('[STATUS] Resetting all status items');
-  [statusCopy, statusConfig, statusDatabase, statusThemes, statusPlugins, statusRollback].forEach(item => {
+  [statusCopy, statusConfig, statusDatabase, statusThemes, statusPlugins, statusPermissions, statusRollback].forEach(item => {
     if (item) {
       item.classList.remove('in-progress', 'success', 'error');
       item.classList.add('pending');
@@ -306,7 +352,7 @@ function resetStatus(): void {
   updateProgress(0);
 
   statusMessage.textContent = '';
-  statusMessage.className = 'status-message';
+  statusMessage.className = 'status-message hidden';
 }
 
 // Enable/disable form
@@ -314,15 +360,17 @@ function setFormEnabled(enabled: boolean): void {
   console.log('[FORM] Setting form enabled:', enabled);
   isGenerating = !enabled;
 
+  // Add/remove generating class to gray out the form
+  form.classList.toggle('generating', !enabled);
+
   generateBtn.disabled = !enabled;
   projectNameInput.disabled = !enabled;
   databaseNameInput.disabled = !enabled;
   destinationPathInput.disabled = !enabled;
   browseBtn.disabled = !enabled;
 
-  // Show/hide cancel button
-  cancelBtn.classList.toggle('hidden', enabled);
-  generateBtn.classList.toggle('hidden', !enabled);
+  // Show/hide status section (with cancel button inside)
+  statusSection.classList.toggle('hidden', enabled);
 }
 
 // Get current database config from form
@@ -437,7 +485,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   statusDatabase = document.getElementById('status-database') as HTMLDivElement;
   statusThemes = document.getElementById('status-themes') as HTMLDivElement;
   statusPlugins = document.getElementById('status-plugins') as HTMLDivElement;
+  statusPermissions = document.getElementById('status-permissions') as HTMLDivElement;
   statusRollback = document.getElementById('status-rollback') as HTMLDivElement;
+  generationHeader = document.querySelector('.generation-header') as HTMLDivElement;
 
   // Theme and plugin inputs
   enableThemesCheckbox = document.getElementById('enableThemes') as HTMLInputElement;
@@ -703,6 +753,9 @@ function setupEventListeners(): void {
         showMessage(result.message || 'Projet généré avec succès', 'success');
         updateProgress(100);
 
+        // Update generation header to show success
+        updateGenerationHeaderState('success', 'Génération terminée !');
+
         // Display VHost and Hosts configurations
         if (result.vhostConfig && result.hostsEntry && result.serverName) {
           vhostSection.classList.remove('hidden');
@@ -712,13 +765,24 @@ function setupEventListeners(): void {
           siteLink.href = `http://${result.serverName}`;
           siteLink.textContent = result.serverName;
         }
+
+        // Re-enable form but keep status visible
+        form.classList.remove('generating');
+        generateBtn.disabled = false;
+        projectNameInput.disabled = false;
+        databaseNameInput.disabled = false;
+        destinationPathInput.disabled = false;
+        browseBtn.disabled = false;
+        isGenerating = false;
       } else {
         showMessage(result.message || 'Erreur lors de la génération', 'error');
+        updateGenerationHeaderState('error', 'Erreur lors de la génération');
+        setFormEnabled(true);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       showMessage(`Erreur inattendue: ${errorMessage}`, 'error');
-    } finally {
+      updateGenerationHeaderState('error', 'Erreur inattendue');
       setFormEnabled(true);
     }
   });

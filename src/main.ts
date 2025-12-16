@@ -6,6 +6,7 @@ import databaseService from './services/databaseService';
 import vhostService from './services/vhostService';
 import { ExtractService } from './services/extractService';
 import { rollbackService } from './services/rollbackService';
+import { permissionsService } from './services/permissionsService';
 import { settings } from './config/settings';
 import { logger } from './utils/logger';
 import Validator from './utils/validator';
@@ -180,7 +181,7 @@ ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: Gen
   }
 
   const projectPath = path.join(destinationPath, projectName);
-  const totalSteps = 3 + (themesPath ? 1 : 0) + (pluginsPath ? 1 : 0) + 1; // +1 pour vhost
+  const totalSteps = 3 + (themesPath ? 1 : 0) + (pluginsPath ? 1 : 0) + 1 + 1; // +1 permissions +1 vhost
   let currentStep = 0;
 
   // Réinitialiser le service de rollback
@@ -284,6 +285,21 @@ ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: Gen
         event.sender.send('status-update', { step: 'plugins', message: `Erreur: ${errorMessage}`, success: false });
       }
     }
+
+    // Step: Configuration des permissions
+    if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+    currentStep++;
+    sendProgress(event, Math.round((currentStep / totalSteps) * 100));
+    event.sender.send('status-update', { step: 'permissions', message: 'Configuration des permissions fichiers/dossiers...' });
+
+    const permissionsResult = await permissionsService.setWordPressPermissions(projectPath);
+    event.sender.send('status-update', {
+      step: 'permissions',
+      message: permissionsResult.message || 'Permissions configurées.',
+      success: permissionsResult.success
+    });
+    logger.info('IPC', 'Configuration des permissions terminée', { result: permissionsResult.message });
 
     // Step final: Génération vhost
     currentStep++;

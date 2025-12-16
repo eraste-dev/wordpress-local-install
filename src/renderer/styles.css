@@ -400,6 +400,14 @@ button {
   letter-spacing: 0.5px;
   margin-top: 10px;
   transition: background-color 0.2s, color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-primary svg {
+  flex-shrink: 0;
 }
 
 .btn-primary:hover {
@@ -443,13 +451,87 @@ button {
   color: var(--text-primary);
 }
 
+/* Form disabled state during generation */
+#generateForm.generating {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(30%);
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+#generateForm.generating input,
+#generateForm.generating button,
+#generateForm.generating select {
+  cursor: not-allowed;
+}
+
 .status-section {
-  margin-top: 40px;
+  margin-top: 30px;
   padding: 25px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color-light);
-  border-radius: 4px;
-  transition: background-color 0.3s, border-color 0.3s;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--accent-primary);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.generation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.generation-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.3em;
+  font-weight: 500;
+  color: var(--accent-primary);
+  margin: 0;
+}
+
+.spinning-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Cancel button - prominent red style */
+.btn-cancel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: var(--status-error);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+}
+
+.btn-cancel:hover {
+  background-color: #ff3333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.4);
+}
+
+.btn-cancel:active {
+  transform: translateY(0);
+}
+
+.btn-cancel svg {
+  flex-shrink: 0;
 }
 
 .status-section h2 {

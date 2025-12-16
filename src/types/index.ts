@@ -9,7 +9,7 @@ export interface GenerateWordPressData {
 }
 
 export interface StatusUpdate {
-  step: 'copy' | 'config' | 'database' | 'themes' | 'plugins' | 'error' | 'rollback';
+  step: 'copy' | 'config' | 'database' | 'themes' | 'plugins' | 'permissions' | 'error' | 'rollback';
   message: string;
   success?: boolean;
   progress?: number; // Progression en pourcentage (0-100)
