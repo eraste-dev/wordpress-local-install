@@ -58,10 +58,37 @@
       </div>
       <h1>WordPress Automation</h1>
       <p class="subtitle">Générateur de projets WordPress automatisé</p>
+
+      <!-- Navigation Menu -->
+      <nav class="main-nav">
+        <button class="nav-link active" data-page="generate">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Générer
+        </button>
+        <button class="nav-link" data-page="delete">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/>
+            <line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+          Supprimer
+        </button>
+        <button class="nav-link" data-page="config">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+          Config
+        </button>
+      </nav>
     </header>
 
     <main>
-      <form id="generateForm">
+      <!-- Page: Générer -->
+      <div id="page-generate" class="page active">
+        <form id="generateForm">
         <div class="form-group">
           <label for="projectName">Nom du projet</label>
           <input
@@ -70,9 +97,10 @@
             name="projectName"
             placeholder="mon-projet-wordpress"
             required
-            pattern="[a-zA-Z0-9_-]+"
-            title="Lettres, chiffres, tirets et underscores uniquement"
+            pattern="[a-zA-Z][a-zA-Z0-9_-]*"
+            title="Doit commencer par une lettre, puis lettres, chiffres, tirets et underscores uniquement"
           />
+          <small id="projectNameError" class="error-text hidden"></small>
         </div>
 
         <div class="form-group">
@@ -83,9 +111,10 @@
             name="databaseName"
             placeholder="ma_base_de_donnees"
             required
-            pattern="[a-zA-Z0-9_]+"
-            title="Lettres, chiffres et underscores uniquement"
+            pattern="[a-zA-Z_][a-zA-Z0-9_]*"
+            title="Doit commencer par une lettre ou underscore, puis lettres, chiffres et underscores uniquement"
           />
+          <small id="databaseNameError" class="error-text hidden"></small>
         </div>
 
         <div class="form-group">
@@ -103,6 +132,63 @@
           <small>Le projet sera créé dans: <span id="fullPath">&lt;destination&gt;/&lt;nom-projet&gt;</span></small>
         </div>
 
+        <!-- Database Configuration Section -->
+        <div class="form-section collapsible">
+          <h3 class="section-title" id="dbConfigToggle">
+            <span class="toggle-icon">▶</span>
+            Configuration Base de données
+          </h3>
+          <div class="section-content hidden" id="dbConfigSection">
+            <div class="form-row">
+              <div class="form-group half">
+                <label for="dbHost">Hôte</label>
+                <input
+                  type="text"
+                  id="dbHost"
+                  name="dbHost"
+                  placeholder="localhost"
+                  value="localhost"
+                />
+              </div>
+              <div class="form-group half">
+                <label for="dbPort">Port</label>
+                <input
+                  type="number"
+                  id="dbPort"
+                  name="dbPort"
+                  placeholder="3306"
+                  value="3306"
+                  min="1"
+                  max="65535"
+                />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group half">
+                <label for="dbUser">Utilisateur</label>
+                <input
+                  type="text"
+                  id="dbUser"
+                  name="dbUser"
+                  placeholder="root"
+                  value="root"
+                />
+              </div>
+              <div class="form-group half">
+                <label for="dbPassword">Mot de passe</label>
+                <input
+                  type="password"
+                  id="dbPassword"
+                  name="dbPassword"
+                  placeholder="Laisser vide si aucun"
+                />
+              </div>
+            </div>
+            <button type="button" id="saveDbConfigBtn" class="btn-secondary btn-small">Sauvegarder la configuration</button>
+          </div>
+        </div>
+
+        <!-- Themes and Plugins Section -->
         <div class="form-section">
           <h3 class="section-title">Options avancées (facultatif)</h3>
 
@@ -143,11 +229,23 @@
           </div>
         </div>
 
-        <button type="submit" id="generateBtn" class="btn-primary">Générer</button>
+        <div class="form-actions">
+          <button type="submit" id="generateBtn" class="btn-primary">Générer</button>
+          <button type="button" id="cancelBtn" class="btn-danger hidden">Annuler</button>
+        </div>
       </form>
 
       <div id="statusSection" class="status-section hidden">
         <h2>Statut de génération</h2>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+          </div>
+          <span class="progress-text" id="progressText">0%</span>
+        </div>
+
         <div class="status-list">
           <div class="status-item" id="status-copy">
             <span class="status-icon">○</span>
@@ -168,6 +266,10 @@
           <div class="status-item hidden" id="status-plugins">
             <span class="status-icon">○</span>
             <span class="status-text">Installation des plugins</span>
+          </div>
+          <div class="status-item hidden" id="status-rollback">
+            <span class="status-icon">○</span>
+            <span class="status-text">Annulation des modifications</span>
           </div>
         </div>
         <div id="statusMessage" class="status-message"></div>
@@ -211,6 +313,187 @@
           </ol>
         </div>
       </div>
+      </div><!-- End page-generate -->
+
+      <!-- Page: Supprimer -->
+      <div id="page-delete" class="page">
+        <div class="page-header">
+          <h2>Supprimer un projet</h2>
+          <p class="page-description">Supprimez un projet WordPress et sa base de données associée</p>
+        </div>
+
+        <div class="delete-warning-box">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <p>Cette action est irréversible. Le projet et sa base de données seront définitivement supprimés.</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label for="deleteProjectPath">Chemin du projet à supprimer</label>
+            <div class="input-with-button">
+              <input
+                type="text"
+                id="deleteProjectPath"
+                name="deleteProjectPath"
+                placeholder="Sélectionnez le dossier du projet WordPress"
+              />
+              <button type="button" id="browseDeleteBtn" class="btn-secondary">Parcourir</button>
+            </div>
+          </div>
+
+          <!-- Project Info Display -->
+          <div id="projectInfoSection" class="project-info hidden">
+            <h4>Informations du projet</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Nom du projet:</span>
+                <span class="info-value" id="deleteProjectName">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Base de données:</span>
+                <span class="info-value" id="deleteDbName">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Utilisateur BDD:</span>
+                <span class="info-value" id="deleteDbUser">-</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Hôte BDD:</span>
+                <span class="info-value" id="deleteDbHost">-</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="deleteDbCheckbox" class="checkbox-toggle" checked>
+                Supprimer également la base de données
+              </label>
+            </div>
+
+            <div class="delete-confirm">
+              <label>
+                <input type="checkbox" id="confirmDeleteCheckbox" class="checkbox-toggle">
+                Je confirme vouloir supprimer ce projet définitivement
+              </label>
+            </div>
+
+            <button type="button" id="deleteProjectBtn" class="btn-danger" disabled>
+              Supprimer le projet
+            </button>
+          </div>
+
+          <!-- Delete Status -->
+          <div id="deleteStatusMessage" class="status-message hidden"></div>
+        </div>
+      </div><!-- End page-delete -->
+
+      <!-- Page: Config -->
+      <div id="page-config" class="page">
+        <div class="page-header">
+          <h2>Configuration</h2>
+          <p class="page-description">Paramètres de connexion à la base de données MySQL</p>
+        </div>
+
+        <div class="form-section">
+          <h3 class="section-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            Base de données MySQL
+          </h3>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="dbHost">Hôte</label>
+              <input
+                type="text"
+                id="configDbHost"
+                name="configDbHost"
+                placeholder="localhost"
+                value="localhost"
+              />
+            </div>
+            <div class="form-group half">
+              <label for="dbPort">Port</label>
+              <input
+                type="number"
+                id="configDbPort"
+                name="configDbPort"
+                placeholder="3306"
+                value="3306"
+                min="1"
+                max="65535"
+              />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="dbUser">Utilisateur</label>
+              <input
+                type="text"
+                id="configDbUser"
+                name="configDbUser"
+                placeholder="root"
+                value="root"
+              />
+            </div>
+            <div class="form-group half">
+              <label for="dbPassword">Mot de passe</label>
+              <input
+                type="password"
+                id="configDbPassword"
+                name="configDbPassword"
+                placeholder="Laisser vide si aucun"
+              />
+            </div>
+          </div>
+
+          <div class="config-actions">
+            <button type="button" id="testDbConfigBtn" class="btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+              Tester la connexion
+            </button>
+            <button type="button" id="saveDbConfigBtnPage" class="btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              Sauvegarder
+            </button>
+          </div>
+
+          <div id="configDbStatus" class="config-status hidden">
+            <span class="status-indicator" id="configDbIndicator">●</span>
+            <span id="configDbStatusText"></span>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="section-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            À propos
+          </h3>
+          <div class="about-info">
+            <p><strong>WordPress Automation</strong></p>
+            <p class="version">Version 1.0.0</p>
+            <p class="description">Application de génération automatisée de projets WordPress locaux avec configuration de base de données, thèmes et plugins.</p>
+          </div>
+        </div>
+      </div><!-- End page-config -->
     </main>
 
     <footer>

@@ -182,10 +182,88 @@ html[data-theme="light"] .theme-icon.moon {
 
 header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--border-color);
   transition: border-color 0.3s ease;
+}
+
+/* Navigation Menu */
+.main-nav {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 25px;
+  padding: 6px;
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.95em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.nav-link.active {
+  background-color: var(--accent-primary);
+  color: var(--bg-primary);
+}
+
+.nav-link svg {
+  flex-shrink: 0;
+}
+
+/* Pages */
+.page {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.page.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-header {
+  margin-bottom: 25px;
+}
+
+.page-header h2 {
+  font-size: 1.5em;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.page-description {
+  color: var(--text-secondary);
+  font-size: 0.95em;
 }
 
 .header-logo {
@@ -659,4 +737,404 @@ footer {
 
 .config-instructions a:hover {
   text-decoration: underline;
+}
+
+/* Progress Bar */
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--status-success));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Form Row (for side-by-side inputs) */
+.form-row {
+  display: flex;
+  gap: 15px;
+}
+
+.form-group.half {
+  flex: 1;
+}
+
+/* Number input styling */
+input[type="number"] {
+  width: 100%;
+  padding: 12px 15px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 1em;
+  border-radius: 4px;
+  transition: border-color 0.2s, background-color 0.3s, color 0.3s;
+}
+
+input[type="number"]:focus {
+  outline: none;
+  border-color: var(--border-color-hover);
+}
+
+/* Password input styling */
+input[type="password"] {
+  width: 100%;
+  padding: 12px 15px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 1em;
+  border-radius: 4px;
+  transition: border-color 0.2s, background-color 0.3s, color 0.3s;
+}
+
+input[type="password"]:focus {
+  outline: none;
+  border-color: var(--border-color-hover);
+}
+
+input[type="password"]::placeholder {
+  color: var(--text-muted);
+}
+
+/* Collapsible Section */
+.form-section.collapsible .section-title {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  margin-bottom: 0;
+  transition: color 0.2s;
+}
+
+.form-section.collapsible .section-title:hover {
+  color: var(--accent-primary);
+}
+
+.toggle-icon {
+  font-size: 0.8em;
+  transition: transform 0.2s;
+}
+
+.section-content {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Small button variant */
+.btn-small {
+  padding: 8px 16px;
+  font-size: 0.9em;
+}
+
+/* Danger button (for cancel) */
+.btn-danger {
+  padding: 15px 30px;
+  background-color: var(--status-error);
+  color: #ffffff;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-top: 10px;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.btn-danger:hover {
+  background-color: #cc0000;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Form actions container */
+.form-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.form-actions .btn-primary,
+.form-actions .btn-danger {
+  flex: 1;
+}
+
+/* Error text for form validation */
+.error-text {
+  color: var(--status-error);
+  font-size: 0.85em;
+  margin-top: 6px;
+}
+
+/* Input error state */
+input:invalid:not(:placeholder-shown) {
+  border-color: var(--status-error);
+}
+
+/* Disabled input styling */
+input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Delete Project Section */
+.delete-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.delete-section .section-title {
+  font-size: 1.1em;
+  font-weight: 500;
+  color: var(--status-error);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  margin-bottom: 0;
+  transition: color 0.2s;
+}
+
+.delete-section .section-title:hover {
+  color: #ff3333;
+}
+
+.delete-warning {
+  color: var(--status-error);
+  font-size: 0.9em;
+  padding: 12px 15px;
+  background-color: rgba(255, 0, 0, 0.1);
+  border: 1px solid var(--status-error);
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+html[data-theme="light"] .delete-warning {
+  background-color: rgba(204, 0, 0, 0.08);
+}
+
+/* Project Info Display */
+.project-info {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.project-info h4 {
+  margin: 0 0 15px 0;
+  color: var(--text-primary);
+  font-size: 1em;
+  font-weight: 500;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-label {
+  font-size: 0.8em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 0.95em;
+  color: var(--text-primary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* Delete Confirm Checkbox */
+.delete-confirm {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: rgba(255, 0, 0, 0.05);
+  border: 1px solid var(--status-error);
+  border-radius: 4px;
+}
+
+.delete-confirm label {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  cursor: pointer;
+  color: var(--status-error);
+  font-weight: 500;
+}
+
+.delete-confirm .checkbox-toggle {
+  margin-right: 10px;
+}
+
+/* Delete Project Button */
+.project-info .btn-danger {
+  width: 100%;
+  margin-top: 20px;
+  padding: 15px;
+}
+
+/* Delete Status Message */
+.delete-section .status-message {
+  margin-top: 15px;
+}
+
+/* Responsive adjustments for info grid */
+@media (max-width: 500px) {
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Delete Warning Box */
+.delete-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px 20px;
+  background-color: rgba(255, 0, 0, 0.08);
+  border: 1px solid var(--status-error);
+  border-radius: 8px;
+  margin-bottom: 25px;
+  color: var(--status-error);
+}
+
+.delete-warning-box svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.delete-warning-box p {
+  margin: 0;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+html[data-theme="light"] .delete-warning-box {
+  background-color: rgba(204, 0, 0, 0.06);
+}
+
+/* Config Page Styles */
+.config-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.config-actions .btn-secondary,
+.config-actions .btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+}
+
+.config-actions .btn-primary {
+  flex: 1;
+}
+
+.config-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 12px 15px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.config-status .status-indicator {
+  font-size: 1.2em;
+}
+
+.config-status .status-indicator.connected {
+  color: var(--status-success);
+}
+
+.config-status .status-indicator.disconnected {
+  color: var(--status-error);
+}
+
+/* About Section */
+.about-info {
+  padding: 15px 0;
+}
+
+.about-info p {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+}
+
+.about-info .version {
+  font-size: 0.9em;
+  color: var(--text-tertiary);
+}
+
+.about-info .description {
+  margin-top: 15px;
+  line-height: 1.6;
+}
+
+/* Section title with icon */
+.section-title svg {
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+/* Responsive Navigation */
+@media (max-width: 600px) {
+  .main-nav {
+    flex-direction: column;
+  }
+
+  .nav-link {
+    justify-content: center;
+  }
 }

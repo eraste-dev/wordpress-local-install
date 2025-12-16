@@ -5,23 +5,49 @@ import configService from './services/configService';
 import databaseService from './services/databaseService';
 import vhostService from './services/vhostService';
 import { ExtractService } from './services/extractService';
-import { GenerateWordPressData, ServiceResult } from './types';
+import { rollbackService } from './services/rollbackService';
+import { settings } from './config/settings';
+import { logger } from './utils/logger';
+import Validator from './utils/validator';
+import PathHelper from './utils/pathHelper';
+import { GenerateWordPressData, ServiceResult, DatabaseConfig, ProjectExistsResult, ProjectInfo, DeleteProjectResult } from './types';
 
 let mainWindow: BrowserWindow | null;
+let currentOperationCanceled = false;
+
+// Initialisation asynchrone
+async function initializeApp(): Promise<void> {
+  logger.info('MAIN', 'Initialisation de l\'application...');
+
+  // Initialiser les settings
+  await settings.initialize();
+  logger.info('MAIN', 'Configuration chargée');
+
+  // Initialiser le logger avec les settings
+  const loggingConfig = settings.getLogging();
+  await logger.initialize({
+    enabled: loggingConfig.enabled,
+    level: loggingConfig.level,
+    maxFiles: loggingConfig.maxFiles,
+    maxFileSize: loggingConfig.maxFileSize,
+    logsDir: settings.getPaths().logsDir
+  });
+
+  logger.info('MAIN', 'Application initialisée avec succès');
+}
 
 function createWindow(): void {
-  console.log('[MAIN] Creating main window...');
+  logger.info('MAIN', 'Création de la fenêtre principale...');
 
   const iconPath = path.join(__dirname, '../assets/logo.png');
-  console.log('[MAIN] Icon path:', iconPath);
 
   mainWindow = new BrowserWindow({
     width: 1000,
-    height: 800,
+    height: 900,
     minWidth: 800,
-    minHeight: 600,
-    frame: false, // Remove default title bar
-    icon: iconPath, // Application icon
+    minHeight: 700,
+    frame: false,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -30,135 +56,251 @@ function createWindow(): void {
     backgroundColor: '#000000',
     resizable: true,
     title: 'WordPress Automation',
-    titleBarStyle: 'hidden', // For macOS
-    trafficLightPosition: { x: 10, y: 10 } // For macOS
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 10, y: 10 }
   });
 
-  console.log('[MAIN] Window created with dimensions: 1000x800');
-
   const htmlPath = path.join(__dirname, 'renderer', 'index.html');
-  console.log('[MAIN] Loading HTML file from:', htmlPath);
   mainWindow.loadFile(htmlPath);
 
-  // Open DevTools in development mode
   if (process.argv.includes('--dev')) {
-    console.log('[MAIN] Development mode detected - opening DevTools');
+    logger.info('MAIN', 'Mode développement - ouverture des DevTools');
     mainWindow.webContents.openDevTools();
   }
 
   mainWindow.on('closed', () => {
-    console.log('[MAIN] Window closed');
+    logger.info('MAIN', 'Fenêtre fermée');
     mainWindow = null;
   });
 }
 
-console.log('[MAIN] Electron app starting...');
-app.whenReady().then(() => {
-  console.log('[MAIN] App is ready');
+// Fonction pour envoyer les mises à jour de progression
+function sendProgress(event: IpcMainInvokeEvent, progress: number): void {
+  event.sender.send('progress-update', progress);
+}
+
+// Vérification d'annulation
+function checkCanceled(): boolean {
+  return currentOperationCanceled;
+}
+
+app.whenReady().then(async () => {
+  await initializeApp();
   createWindow();
+  logger.info('MAIN', 'Application prête');
 });
 
 app.on('window-all-closed', () => {
-  console.log('[MAIN] All windows closed');
+  logger.info('MAIN', 'Toutes les fenêtres fermées');
   if (process.platform !== 'darwin') {
-    console.log('[MAIN] Quitting app (not macOS)');
     app.quit();
   }
 });
 
 app.on('activate', () => {
-  console.log('[MAIN] App activated');
   if (BrowserWindow.getAllWindows().length === 0) {
-    console.log('[MAIN] No windows open - creating new window');
     createWindow();
   }
 });
 
 // IPC Handlers
-ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: GenerateWordPressData): Promise<ServiceResult> => {
-  console.log('[IPC] Received generate-wordpress request:', data);
-  const { projectName, databaseName, destinationPath, themesPath, pluginsPath } = data;
+
+// Vérifier si un projet existe déjà
+ipcMain.handle('check-project-exists', async (_event: IpcMainInvokeEvent, projectName: string, destinationPath: string): Promise<ProjectExistsResult> => {
+  logger.info('IPC', 'Vérification de l\'existence du projet', { projectName, destinationPath });
+
+  const projectPath = path.join(destinationPath, projectName);
+  const exists = await PathHelper.exists(projectPath);
+
+  return { exists, path: exists ? projectPath : undefined };
+});
+
+// Annuler l'opération en cours
+ipcMain.handle('cancel-operation', async (): Promise<void> => {
+  logger.warn('IPC', 'Annulation de l\'opération demandée');
+  currentOperationCanceled = true;
+});
+
+// Obtenir la configuration BDD actuelle
+ipcMain.handle('get-db-config', async (): Promise<DatabaseConfig> => {
+  return settings.getDatabase();
+});
+
+// Mettre à jour la configuration BDD
+ipcMain.handle('update-db-config', async (_event: IpcMainInvokeEvent, config: DatabaseConfig): Promise<ServiceResult> => {
+  logger.info('IPC', 'Mise à jour de la configuration BDD', { host: config.host, port: config.port, user: config.user });
 
   try {
-    // Step 1: Copy WordPress base
-    console.log('[IPC] Step 1: Copying WordPress files...');
-    event.sender.send('status-update', { step: 'copy', message: 'Copie du dossier WordPress...' });
+    // Valider la configuration
+    const validation = Validator.validateDatabaseConfig(config);
+    if (!validation.valid) {
+      return { success: false, message: validation.error };
+    }
+
+    // Mettre à jour les settings
+    await settings.updateDatabase(config);
+
+    // Mettre à jour le service de base de données
+    databaseService.setConfig(config);
+
+    return { success: true, message: 'Configuration mise à jour' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+    logger.error('IPC', 'Erreur lors de la mise à jour de la config BDD', { error: errorMessage });
+    return { success: false, message: errorMessage };
+  }
+});
+
+// Génération WordPress avec rollback et progression
+ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: GenerateWordPressData): Promise<ServiceResult> => {
+  logger.info('IPC', 'Début de la génération WordPress', data);
+  currentOperationCanceled = false;
+
+  const { projectName, databaseName, destinationPath, themesPath, pluginsPath, dbConfig } = data;
+
+  // Validation des entrées
+  const projectValidation = Validator.validateProjectName(projectName);
+  if (!projectValidation.valid) {
+    return { success: false, message: projectValidation.error };
+  }
+
+  const dbValidation = Validator.validateDatabaseName(databaseName);
+  if (!dbValidation.valid) {
+    return { success: false, message: dbValidation.error };
+  }
+
+  const pathValidation = Validator.validatePath(destinationPath);
+  if (!pathValidation.valid) {
+    return { success: false, message: pathValidation.error };
+  }
+
+  // Appliquer la configuration BDD si fournie
+  if (dbConfig) {
+    databaseService.setConfig(dbConfig);
+  }
+
+  const projectPath = path.join(destinationPath, projectName);
+  const totalSteps = 3 + (themesPath ? 1 : 0) + (pluginsPath ? 1 : 0) + 1; // +1 pour vhost
+  let currentStep = 0;
+
+  // Réinitialiser le service de rollback
+  rollbackService.clear();
+
+  try {
+    // Vérification de doublon
+    if (await PathHelper.exists(projectPath)) {
+      logger.warn('IPC', 'Le projet existe déjà', { projectPath });
+      return {
+        success: false,
+        message: `Le projet "${projectName}" existe déjà dans ce répertoire. Veuillez choisir un autre nom ou supprimer le dossier existant.`
+      };
+    }
+
+    // Step 1: Copie WordPress
+    if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+    currentStep++;
+    sendProgress(event, Math.round((currentStep / totalSteps) * 100));
+    event.sender.send('status-update', { step: 'copy', message: 'Copie du dossier WordPress...', progress: 10 });
+
     const wordpressSourcePath = path.join(__dirname, '../assets/wordpress-base');
-    const projectPath = path.join(destinationPath, projectName);
-    console.log('[IPC] Source:', wordpressSourcePath);
-    console.log('[IPC] Destination:', projectPath);
+    logger.info('IPC', 'Copie WordPress', { source: wordpressSourcePath, destination: projectPath });
 
     await copyService.copyWordPress(wordpressSourcePath, projectPath);
-    console.log('[IPC] Copy completed successfully');
+    rollbackService.registerDirectoryCreation(projectPath);
+
     event.sender.send('status-update', { step: 'copy', message: 'Copie terminée avec succès.', success: true });
+    logger.info('IPC', 'Copie terminée');
 
-    // Step 2: Update wp-config.php
-    console.log('[IPC] Step 2: Updating wp-config.php...');
+    // Step 2: Configuration wp-config.php
+    if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+    currentStep++;
+    sendProgress(event, Math.round((currentStep / totalSteps) * 100));
     event.sender.send('status-update', { step: 'config', message: 'Modification du wp-config.php...' });
+
     const configPath = path.join(projectPath, 'wp-config.php');
-    console.log('[IPC] Config path:', configPath);
     await configService.updateConfig(configPath, databaseName);
-    console.log('[IPC] Config updated successfully');
+
     event.sender.send('status-update', { step: 'config', message: 'Configuration mise à jour.', success: true });
+    logger.info('IPC', 'Configuration terminée');
 
-    // Step 3: Create MySQL database
-    console.log('[IPC] Step 3: Creating database...');
+    // Step 3: Création base de données
+    if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+    currentStep++;
+    sendProgress(event, Math.round((currentStep / totalSteps) * 100));
     event.sender.send('status-update', { step: 'database', message: 'Création de la base de données...' });
-    await databaseService.createDatabase(databaseName);
-    console.log('[IPC] Database created successfully');
-    event.sender.send('status-update', { step: 'database', message: 'Base de données créée avec succès.', success: true });
 
-    // Step 4: Install themes (optional)
+    const currentDbConfig = databaseService.getConfig();
+    await databaseService.createDatabase(databaseName);
+    rollbackService.registerDatabaseCreation(databaseName, currentDbConfig);
+
+    event.sender.send('status-update', { step: 'database', message: 'Base de données créée avec succès.', success: true });
+    logger.info('IPC', 'Base de données créée');
+
+    // Step 4: Installation thèmes (optionnel)
     if (themesPath) {
-      console.log('[IPC] Step 4: Installing themes from:', themesPath);
+      if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+      currentStep++;
+      sendProgress(event, Math.round((currentStep / totalSteps) * 100));
       event.sender.send('status-update', { step: 'themes', message: 'Installation des thèmes...' });
+
       try {
         const themesResult = await ExtractService.extractThemesFromDirectory(themesPath, projectPath);
-        if (themesResult.success) {
-          console.log('[IPC] Themes installed successfully:', themesResult.message);
-          event.sender.send('status-update', { step: 'themes', message: themesResult.message, success: true });
-        } else {
-          console.warn('[IPC] Themes installation failed:', themesResult.message);
-          event.sender.send('status-update', { step: 'themes', message: themesResult.message, success: false });
-        }
+        event.sender.send('status-update', {
+          step: 'themes',
+          message: themesResult.message,
+          success: themesResult.success
+        });
+        logger.info('IPC', 'Installation des thèmes terminée', { result: themesResult.message });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-        console.error('[IPC] Error installing themes:', errorMessage);
+        logger.error('IPC', 'Erreur installation thèmes', { error: errorMessage });
         event.sender.send('status-update', { step: 'themes', message: `Erreur: ${errorMessage}`, success: false });
       }
     }
 
-    // Step 5: Install plugins (optional)
+    // Step 5: Installation plugins (optionnel)
     if (pluginsPath) {
-      console.log('[IPC] Step 5: Installing plugins from:', pluginsPath);
+      if (checkCanceled()) throw new Error('Opération annulée par l\'utilisateur');
+
+      currentStep++;
+      sendProgress(event, Math.round((currentStep / totalSteps) * 100));
       event.sender.send('status-update', { step: 'plugins', message: 'Installation des plugins...' });
+
       try {
         const pluginsResult = await ExtractService.extractPluginsFromDirectory(pluginsPath, projectPath);
-        if (pluginsResult.success) {
-          console.log('[IPC] Plugins installed successfully:', pluginsResult.message);
-          event.sender.send('status-update', { step: 'plugins', message: pluginsResult.message, success: true });
-        } else {
-          console.warn('[IPC] Plugins installation failed:', pluginsResult.message);
-          event.sender.send('status-update', { step: 'plugins', message: pluginsResult.message, success: false });
-        }
+        event.sender.send('status-update', {
+          step: 'plugins',
+          message: pluginsResult.message,
+          success: pluginsResult.success
+        });
+        logger.info('IPC', 'Installation des plugins terminée', { result: pluginsResult.message });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-        console.error('[IPC] Error installing plugins:', errorMessage);
+        logger.error('IPC', 'Erreur installation plugins', { error: errorMessage });
         event.sender.send('status-update', { step: 'plugins', message: `Erreur: ${errorMessage}`, success: false });
       }
     }
 
-    // Step 6: Generate vhost and hosts configurations
-    console.log('[IPC] Final step: Generating vhost and hosts configurations...');
+    // Step final: Génération vhost
+    currentStep++;
+    sendProgress(event, 100);
+
     const serverName = data.serverName || vhostService.getSuggestedServerName(projectName);
     const configs = vhostService.generateConfigs({
       projectName,
       projectPath,
       serverName
     });
-    console.log('[IPC] Vhost and hosts configurations generated');
 
-    console.log('[IPC] WordPress generation completed successfully!');
+    logger.info('IPC', 'Génération WordPress terminée avec succès!');
+
+    // Effacer les actions de rollback (succès)
+    rollbackService.clear();
+
     return {
       success: true,
       message: 'Projet WordPress généré avec succès!',
@@ -166,37 +308,64 @@ ipcMain.handle('generate-wordpress', async (event: IpcMainInvokeEvent, data: Gen
       hostsEntry: configs.hostsEntry,
       serverName: serverName
     };
+
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    console.error('[IPC] Error during WordPress generation:', errorMessage);
+    logger.error('IPC', 'Erreur lors de la génération', { error: errorMessage });
+
+    // Exécuter le rollback
+    event.sender.send('status-update', {
+      step: 'rollback',
+      message: 'Annulation des modifications...',
+      success: false
+    });
+
+    const rollbackResult = await rollbackService.execute();
+
+    if (!rollbackResult.success) {
+      logger.error('IPC', 'Erreurs lors du rollback', { errors: rollbackResult.errors });
+    }
+
     event.sender.send('status-update', {
       step: 'error',
       message: `Erreur: ${errorMessage}`,
       success: false
     });
+
     return { success: false, message: errorMessage };
   }
 });
 
-// Test database connection
-ipcMain.handle('test-db-connection', async (): Promise<ServiceResult> => {
-  console.log('[IPC] Testing database connection...');
+// Test connexion base de données avec config optionnelle
+ipcMain.handle('test-db-connection', async (_event: IpcMainInvokeEvent, config?: DatabaseConfig): Promise<ServiceResult> => {
+  logger.info('IPC', 'Test de connexion BDD');
+
   try {
+    if (config) {
+      // Tester avec une config spécifique sans modifier les settings
+      const validation = Validator.validateDatabaseConfig(config);
+      if (!validation.valid) {
+        return { success: false, message: validation.error };
+      }
+      databaseService.setConfig(config);
+    }
+
     const result = await databaseService.testConnection();
-    console.log('[IPC] Database connection test result:', result);
+    logger.info('IPC', 'Test de connexion réussi', { message: result.message });
     return { success: true, message: result.message || 'Connexion MySQL réussie.' };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    console.error('[IPC] Database connection test failed:', errorMessage);
+    logger.error('IPC', 'Test de connexion échoué', { error: errorMessage });
     return { success: false, message: `Erreur de connexion: ${errorMessage}` };
   }
 });
 
-// Select directory dialog
+// Sélection de répertoire
 ipcMain.handle('select-directory', async (): Promise<string | null> => {
-  console.log('[IPC] Opening directory selection dialog...');
+  logger.debug('IPC', 'Ouverture du sélecteur de répertoire');
+
   if (!mainWindow) {
-    console.error('[IPC] Main window not available');
+    logger.error('IPC', 'Fenêtre principale non disponible');
     return null;
   }
 
@@ -205,39 +374,71 @@ ipcMain.handle('select-directory', async (): Promise<string | null> => {
   });
 
   if (result.canceled || result.filePaths.length === 0) {
-    console.log('[IPC] Directory selection canceled');
+    logger.debug('IPC', 'Sélection de répertoire annulée');
     return null;
   }
 
   const selectedPath = result.filePaths[0];
-  console.log('[IPC] Directory selected:', selectedPath);
+  logger.debug('IPC', 'Répertoire sélectionné', { path: selectedPath });
   return selectedPath;
 });
 
-// Window control handlers
+// Obtenir les informations d'un projet WordPress
+ipcMain.handle('get-project-info', async (_event: IpcMainInvokeEvent, projectPath: string): Promise<ProjectInfo> => {
+  logger.info('IPC', 'Récupération des infos du projet', { projectPath });
+
+  const { deleteService } = await import('./services/deleteService');
+
+  const isValid = await deleteService.isWordPressProject(projectPath);
+  const wpConfig = isValid ? await deleteService.extractWpConfig(projectPath) : null;
+
+  return {
+    path: projectPath,
+    name: path.basename(projectPath),
+    isValid,
+    wpConfig: wpConfig || undefined
+  };
+});
+
+// Supprimer un projet WordPress
+ipcMain.handle('delete-project', async (event: IpcMainInvokeEvent, projectPath: string, deleteDb: boolean): Promise<DeleteProjectResult> => {
+  logger.warn('IPC', 'Suppression de projet demandée', { projectPath, deleteDb });
+
+  const { deleteService } = await import('./services/deleteService');
+
+  event.sender.send('status-update', {
+    step: 'delete',
+    message: 'Suppression du projet en cours...'
+  });
+
+  const result = await deleteService.deleteProject(projectPath, deleteDb);
+
+  event.sender.send('status-update', {
+    step: 'delete',
+    message: result.message,
+    success: result.success
+  });
+
+  return result;
+});
+
+// Contrôles de fenêtre
 ipcMain.on('window-minimize', () => {
-  console.log('[IPC] Window minimize requested');
-  if (mainWindow) {
-    mainWindow.minimize();
-  }
+  logger.debug('IPC', 'Réduction de la fenêtre');
+  mainWindow?.minimize();
 });
 
 ipcMain.on('window-maximize', () => {
-  console.log('[IPC] Window maximize/restore requested');
   if (mainWindow) {
     if (mainWindow.isMaximized()) {
-      console.log('[IPC] Window is maximized - restoring');
       mainWindow.unmaximize();
     } else {
-      console.log('[IPC] Window is not maximized - maximizing');
       mainWindow.maximize();
     }
   }
 });
 
 ipcMain.on('window-close', () => {
-  console.log('[IPC] Window close requested');
-  if (mainWindow) {
-    mainWindow.close();
-  }
+  logger.debug('IPC', 'Fermeture de la fenêtre');
+  mainWindow?.close();
 });

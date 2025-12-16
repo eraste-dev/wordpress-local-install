@@ -51,6 +51,22 @@ class DatabaseService {
   }
 
   /**
+   * Drop (delete) a database
+   * @param databaseName - Name of the database to drop
+   */
+  async dropDatabase(databaseName: string): Promise<ServiceResult> {
+    console.log('[DATABASE] Dropping database:', databaseName);
+    // Utiliser la méthode dropDatabase du driver MySQL
+    const mysqlDriver = this.driver as any;
+    if (typeof mysqlDriver.dropDatabase === 'function') {
+      const result = await mysqlDriver.dropDatabase(databaseName);
+      console.log('[DATABASE] Database drop result:', result);
+      return result;
+    }
+    throw new Error('Le driver ne supporte pas la suppression de base de données');
+  }
+
+  /**
    * Update database connection configuration
    * @param config - Configuration object with host, user, password, port
    */

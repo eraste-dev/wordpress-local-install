@@ -1,22 +1,27 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { ServiceResult } from '../types';
+import PathHelper from '../utils/pathHelper';
+import Validator from '../utils/validator';
+import { logger } from '../utils/logger';
 
-const execAsync = promisify(exec);
+/**
+ * Service d'extraction sécurisé pour les thèmes et plugins WordPress
+ * Utilise spawn au lieu de exec pour éviter les injections de commandes
+ */
 
 export class ExtractService {
   /**
    * Vérifie si une commande est disponible sur le système
    */
   private static async isCommandAvailable(command: string): Promise<boolean> {
-    try {
-      await execAsync(`which ${command}`);
-      return true;
-    } catch {
-      return false;
-    }
+    return new Promise((resolve) => {
+      const which = process.platform === 'win32' ? 'where' : 'which';
+      const proc = spawn(which, [command], { stdio: 'ignore' });
+      proc.on('close', (code) => resolve(code === 0));
+      proc.on('error', () => resolve(false));
+    });
   }
 
   /**
@@ -30,34 +35,87 @@ export class ExtractService {
   }
 
   /**
-   * Extrait une archive dans un dossier temporaire
+   * Extrait une archive de manière sécurisée (sans injection de commandes)
    */
   private static async extractToTemp(archivePath: string, tempDir: string): Promise<void> {
+    // Validation des chemins
+    const archiveValidation = Validator.validatePath(archivePath);
+    if (!archiveValidation.valid) {
+      throw new Error(`Chemin d'archive invalide: ${archiveValidation.error}`);
+    }
+
+    const tempValidation = Validator.validatePath(tempDir);
+    if (!tempValidation.valid) {
+      throw new Error(`Chemin temporaire invalide: ${tempValidation.error}`);
+    }
+
     const archiveType = this.getArchiveType(archivePath);
 
-    if (archiveType === 'zip') {
-      await execAsync(`unzip -q "${archivePath}" -d "${tempDir}"`);
-    } else if (archiveType === 'rar') {
-      const hasUnrar = await this.isCommandAvailable('unrar');
-      if (!hasUnrar) {
-        throw new Error('unrar n\'est pas installé. Installez-le avec: sudo apt-get install unrar');
+    return new Promise((resolve, reject) => {
+      let proc;
+
+      if (archiveType === 'zip') {
+        // Utiliser spawn avec des arguments séparés (sécurisé)
+        proc = spawn('unzip', ['-q', archivePath, '-d', tempDir], {
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else if (archiveType === 'rar') {
+        // Vérifier si unrar est disponible
+        this.isCommandAvailable('unrar').then((hasUnrar) => {
+          if (!hasUnrar) {
+            reject(new Error('unrar n\'est pas installé. Installez-le avec: sudo apt-get install unrar'));
+            return;
+          }
+        });
+
+        proc = spawn('unrar', ['x', '-idq', archivePath, tempDir + '/'], {
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+      } else {
+        reject(new Error('Format d\'archive non supporté. Utilisez .zip ou .rar'));
+        return;
       }
-      await execAsync(`unrar x -idq "${archivePath}" "${tempDir}/"`);
-    } else {
-      throw new Error('Format d\'archive non supporté. Utilisez .zip ou .rar');
-    }
+
+      let stderr = '';
+
+      proc.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          logger.info('EXTRACT', `Archive extraite avec succès`, { archivePath, tempDir });
+          resolve();
+        } else {
+          logger.error('EXTRACT', `Échec de l'extraction`, { archivePath, code, stderr });
+          reject(new Error(`Erreur d'extraction (code ${code}): ${stderr || 'Erreur inconnue'}`));
+        }
+      });
+
+      proc.on('error', (error) => {
+        logger.error('EXTRACT', `Erreur de processus`, { error: error.message });
+        reject(new Error(`Erreur lors de l'extraction: ${error.message}`));
+      });
+    });
   }
 
   /**
    * Nettoie les dossiers __MACOSX et autres fichiers système
    */
   private static async cleanSystemFiles(dir: string): Promise<void> {
-    const items = await fs.readdir(dir);
+    try {
+      const items = await fs.readdir(dir);
+      const systemFiles = ['__MACOSX', '.DS_Store', 'Thumbs.db', 'desktop.ini'];
 
-    for (const item of items) {
-      if (item === '__MACOSX' || item === '.DS_Store' || item.startsWith('._')) {
-        await fs.remove(path.join(dir, item));
+      for (const item of items) {
+        if (systemFiles.includes(item) || item.startsWith('._')) {
+          const itemPath = path.join(dir, item);
+          await fs.remove(itemPath);
+          logger.debug('EXTRACT', `Fichier système supprimé: ${item}`);
+        }
       }
+    } catch (error) {
+      logger.warn('EXTRACT', `Erreur lors du nettoyage des fichiers système`, { error });
     }
   }
 
@@ -70,8 +128,8 @@ export class ExtractService {
     await this.cleanSystemFiles(extractDir);
 
     const items = await fs.readdir(extractDir);
-    const dirs = [];
-    const files = [];
+    const dirs: string[] = [];
+    const files: string[] = [];
 
     for (const item of items) {
       const itemPath = path.join(extractDir, item);
@@ -114,7 +172,8 @@ export class ExtractService {
     archivePath: string,
     wordpressPath: string
   ): Promise<ServiceResult> {
-    const tempDir = path.join('/tmp', `theme-extract-${Date.now()}`);
+    // Créer un répertoire temporaire unique
+    const tempDir = PathHelper.createTempDir('theme-extract');
 
     try {
       // Vérifier que l'archive existe
@@ -125,8 +184,18 @@ export class ExtractService {
         };
       }
 
-      // Créer un dossier temporaire
+      // Valider le chemin WordPress
+      const wpValidation = Validator.validatePath(wordpressPath);
+      if (!wpValidation.valid) {
+        return {
+          success: false,
+          message: `Chemin WordPress invalide: ${wpValidation.error}`
+        };
+      }
+
+      // Créer le dossier temporaire
       await fs.ensureDir(tempDir);
+      logger.info('EXTRACT', `Extraction du thème`, { archivePath, tempDir });
 
       // Extraire l'archive
       await this.extractToTemp(archivePath, tempDir);
@@ -147,20 +216,25 @@ export class ExtractService {
       // Nettoyer le dossier temporaire
       await fs.remove(tempDir);
 
+      logger.info('EXTRACT', `Thème installé avec succès`, { themeName, destination: themeDestination });
+
       return {
         success: true,
         message: `Thème "${themeName}" installé avec succès`,
         themeName
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Nettoyer en cas d'erreur
       if (await fs.pathExists(tempDir)) {
         await fs.remove(tempDir);
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      logger.error('EXTRACT', `Erreur lors de l'extraction du thème`, { error: errorMessage });
+
       return {
         success: false,
-        message: `Erreur lors de l'extraction du thème: ${error.message}`
+        message: `Erreur lors de l'extraction du thème: ${errorMessage}`
       };
     }
   }
@@ -172,7 +246,8 @@ export class ExtractService {
     archivePath: string,
     wordpressPath: string
   ): Promise<ServiceResult> {
-    const tempDir = path.join('/tmp', `plugin-extract-${Date.now()}`);
+    // Créer un répertoire temporaire unique
+    const tempDir = PathHelper.createTempDir('plugin-extract');
 
     try {
       // Vérifier que l'archive existe
@@ -183,8 +258,18 @@ export class ExtractService {
         };
       }
 
-      // Créer un dossier temporaire
+      // Valider le chemin WordPress
+      const wpValidation = Validator.validatePath(wordpressPath);
+      if (!wpValidation.valid) {
+        return {
+          success: false,
+          message: `Chemin WordPress invalide: ${wpValidation.error}`
+        };
+      }
+
+      // Créer le dossier temporaire
       await fs.ensureDir(tempDir);
+      logger.info('EXTRACT', `Extraction du plugin`, { archivePath, tempDir });
 
       // Extraire l'archive
       await this.extractToTemp(archivePath, tempDir);
@@ -205,20 +290,25 @@ export class ExtractService {
       // Nettoyer le dossier temporaire
       await fs.remove(tempDir);
 
+      logger.info('EXTRACT', `Plugin installé avec succès`, { pluginName, destination: pluginDestination });
+
       return {
         success: true,
         message: `Plugin "${pluginName}" installé avec succès`,
         pluginName
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Nettoyer en cas d'erreur
       if (await fs.pathExists(tempDir)) {
         await fs.remove(tempDir);
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      logger.error('EXTRACT', `Erreur lors de l'extraction du plugin`, { error: errorMessage });
+
       return {
         success: false,
-        message: `Erreur lors de l'extraction du plugin: ${error.message}`
+        message: `Erreur lors de l'extraction du plugin: ${errorMessage}`
       };
     }
   }
@@ -231,6 +321,15 @@ export class ExtractService {
     wordpressPath: string
   ): Promise<ServiceResult> {
     try {
+      // Valider le chemin
+      const validation = Validator.validatePath(themesDir);
+      if (!validation.valid) {
+        return {
+          success: false,
+          message: `Chemin de thèmes invalide: ${validation.error}`
+        };
+      }
+
       if (!await fs.pathExists(themesDir)) {
         return {
           success: false,
@@ -251,6 +350,8 @@ export class ExtractService {
         };
       }
 
+      logger.info('EXTRACT', `Extraction de ${archives.length} thème(s)`, { themesDir });
+
       const results = [];
       for (const archive of archives) {
         const archivePath = path.join(themesDir, archive);
@@ -266,10 +367,13 @@ export class ExtractService {
         message: `${successCount} thème(s) installé(s), ${failedCount} échec(s)`,
         results
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      logger.error('EXTRACT', `Erreur lors de l'extraction des thèmes`, { error: errorMessage });
+
       return {
         success: false,
-        message: `Erreur lors de l'extraction des thèmes: ${error.message}`
+        message: `Erreur lors de l'extraction des thèmes: ${errorMessage}`
       };
     }
   }
@@ -282,6 +386,15 @@ export class ExtractService {
     wordpressPath: string
   ): Promise<ServiceResult> {
     try {
+      // Valider le chemin
+      const validation = Validator.validatePath(pluginsDir);
+      if (!validation.valid) {
+        return {
+          success: false,
+          message: `Chemin de plugins invalide: ${validation.error}`
+        };
+      }
+
       if (!await fs.pathExists(pluginsDir)) {
         return {
           success: false,
@@ -302,6 +415,8 @@ export class ExtractService {
         };
       }
 
+      logger.info('EXTRACT', `Extraction de ${archives.length} plugin(s)`, { pluginsDir });
+
       const results = [];
       for (const archive of archives) {
         const archivePath = path.join(pluginsDir, archive);
@@ -317,10 +432,13 @@ export class ExtractService {
         message: `${successCount} plugin(s) installé(s), ${failedCount} échec(s)`,
         results
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+      logger.error('EXTRACT', `Erreur lors de l'extraction des plugins`, { error: errorMessage });
+
       return {
         success: false,
-        message: `Erreur lors de l'extraction des plugins: ${error.message}`
+        message: `Erreur lors de l'extraction des plugins: ${errorMessage}`
       };
     }
   }
