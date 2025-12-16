@@ -1,7 +1,7 @@
 {
-  "name": "wordpress-automation-app",
+  "name": "wpgen",
   "version": "1.0.0",
-  "description": "Application d'automatisation WordPress - Copie, Configuration et Base de données",
+  "description": "Générateur de projets WordPress locaux",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && node scripts/post-build.js",
@@ -16,8 +16,8 @@
     "clean": "rm -rf dist"
   },
   "build": {
-    "appId": "com.wordpress.automation",
-    "productName": "WordPress Automation",
+    "appId": "com.eraste.wpgen",
+    "productName": "WPGen",
     "directories": {
       "output": "build"
     },
